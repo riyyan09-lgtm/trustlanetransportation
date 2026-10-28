@@ -14,16 +14,16 @@ module.exports = async function handler(req, res) {
      !/^\d{4}-\d{2}-\d{2}$/.test(b.preferred_date || '') || Number.isNaN(Date.parse(b.preferred_date)) || new Date(b.preferred_date).toISOString().slice(0,10) !== b.preferred_date ||
      (b.details && !text(b.details,1,2000))) return res.status(400).json({error:'Please check the required fields and try again.'});
   if(b.website) return res.status(400).json({error:'Unable to submit request.'});
-  const {SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY,TURNSTILE_SECRET_KEY}=process.env;
-  if(SUPABASE_URL !== 'https://esevschvewgsvrisyixd.supabase.co' || !SUPABASE_SERVICE_ROLE_KEY || !TURNSTILE_SECRET_KEY) return res.status(503).json({error:'Quote requests are temporarily unavailable. Please try again later.'});
+  const {SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY}=process.env;
+  if(SUPABASE_URL !== 'https://esevschvewgsvrisyixd.supabase.co' || !SUPABASE_SERVICE_ROLE_KEY) return res.status(503).json({error:'Quote requests are temporarily unavailable. Please try again later.'});
   try {
-    const verify=await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secret:TURNSTILE_SECRET_KEY,response:b.turnstile_token})});
-    const result=await verify.json();
-    if(!verify.ok || !result.success) return res.status(400).json({error:'Please complete the verification and try again.'});
+    const ip=(req.headers['x-real-ip'] || req.headers['x-forwarded-for'] || '').toString().split(',')[0].trim().slice(0,100) || 'unknown';
+    const limited=await fetch(`${SUPABASE_URL}/rest/v1/rpc/trustlane_accept_quote`,{method:'POST',headers:{apikey:SUPABASE_SERVICE_ROLE_KEY,Authorization:`Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({p_key:ip})});
+    if(!limited.ok) throw new Error('rate limit check failure');
+    if(await limited.json() !== true) return res.status(429).json({error:'Too many requests. Please wait before trying again.'});
     const row={request_id:b.request_id,name:b.name.trim(),email:b.email.trim(),phone:b.phone.trim(),pickup:b.pickup.trim(),delivery:b.delivery.trim(),vehicle_year:year,vehicle_make:b.vehicle_make.trim(),vehicle_model:b.vehicle_model.trim(),preferred_date:b.preferred_date,details:(b.details||'').trim()};
     const saved=await fetch(`${SUPABASE_URL}/rest/v1/trustlane_quote_requests?on_conflict=request_id`,{method:'POST',headers:{apikey:SUPABASE_SERVICE_ROLE_KEY,Authorization:`Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,'Content-Type':'application/json',Prefer:'resolution=ignore-duplicates,return=minimal'},body:JSON.stringify(row)});
     if(!saved.ok) throw new Error('storage failure');
     return res.status(200).json({success:true});
   } catch {return res.status(503).json({error:'We could not save your request. Please try again.'});}
 };
-
