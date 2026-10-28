@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /portal
+Disallow: /crm
+Sitemap: https://trustlanetransportation.com/sitemap.xml
+
