@@ -27,3 +27,4 @@ begin
 end $$;
 revoke all on function public.trustlane_accept_quote(text) from public, anon, authenticated;
 grant execute on function public.trustlane_accept_quote(text) to service_role;
+
