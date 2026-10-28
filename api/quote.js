@@ -1,7 +1,7 @@
 const MAX_BODY = 12000;
 const text = (v, min, max) => typeof v === 'string' && v.trim().length >= min && v.trim().length <= max;
 module.exports = async function handler(req, res) {
-  res.setHeader('Cache-Control','no-store');
+  res.setHeader('Cache-Control','no-store');res.setHeader('X-Robots-Tag','noindex, nofollow');
   if(req.method !== 'POST') return res.status(405).json({error:'Method not allowed.'});
   if(Number(req.headers['content-length'] || 0) > MAX_BODY) return res.status(413).json({error:'Request too large.'});
   const b=req.body;
