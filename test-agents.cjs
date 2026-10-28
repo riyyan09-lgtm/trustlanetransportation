@@ -1,0 +1,7 @@
+const test=require('node:test');const assert=require('node:assert/strict');const handler=require('./api/agents');
+function res(){return {statusCode:200,setHeader(){},status(n){this.statusCode=n;return this},json(v){this.body=v;return this}}}
+process.env.SUPABASE_URL='https://esevschvewgsvrisyixd.supabase.co';process.env.SUPABASE_SERVICE_ROLE_KEY='fake';process.env.SUPABASE_ANON_KEY='public';
+test('rejects anonymous requests before calling Supabase',async()=>{let called=false;global.fetch=async()=>{called=true};const r=res();await handler({method:'POST',headers:{},body:{action:'invite'}},r);assert.equal(r.statusCode,401);assert.equal(called,false)});
+test('agents cannot invite users',async()=>{let calls=0;global.fetch=async()=>{calls++;return calls===1?{ok:true,json:async()=>({id:'123'})}:{ok:true,json:async()=>[{role:'agent',active:true}]}};const r=res();await handler({method:'POST',headers:{authorization:'Bearer test'},body:{action:'invite',email:'agent@example.test',name:'Agent'}},r);assert.equal(r.statusCode,403);assert.equal(calls,2)});
+test('inactive admins cannot invite users',async()=>{let calls=0;global.fetch=async()=>{calls++;return calls===1?{ok:true,json:async()=>({id:'123'})}:{ok:true,json:async()=>[{role:'admin',active:false}]}};const r=res();await handler({method:'POST',headers:{authorization:'Bearer test'},body:{action:'invite',email:'agent@example.test',name:'Agent'}},r);assert.equal(r.statusCode,403);assert.equal(calls,2)});
+

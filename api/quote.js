@@ -11,11 +11,11 @@ module.exports = async function handler(req, res) {
      !text(b.name,2,120) || !text(b.email,5,254) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(b.email) ||
      !text(b.phone,7,40) || (b.phone.match(/\d/g)||[]).length < 7 || !text(b.pickup,2,160) || !text(b.delivery,2,160) ||
      !Number.isInteger(year) || year<1886 || year>2100 || !text(b.vehicle_make,1,80) || !text(b.vehicle_model,1,80) ||
-     !/^\d{4}-\d{2}-\d{2}$/.test(b.preferred_date || '') || Number.isNaN(Date.parse(b.preferred_date)) ||
+     !/^\d{4}-\d{2}-\d{2}$/.test(b.preferred_date || '') || Number.isNaN(Date.parse(b.preferred_date)) || new Date(b.preferred_date).toISOString().slice(0,10) !== b.preferred_date ||
      (b.details && !text(b.details,1,2000))) return res.status(400).json({error:'Please check the required fields and try again.'});
   if(b.website) return res.status(400).json({error:'Unable to submit request.'});
   const {SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY,TURNSTILE_SECRET_KEY}=process.env;
-  if(!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !TURNSTILE_SECRET_KEY) return res.status(503).json({error:'Quote requests are temporarily unavailable. Please try again later.'});
+  if(SUPABASE_URL !== 'https://esevschvewgsvrisyixd.supabase.co' || !SUPABASE_SERVICE_ROLE_KEY || !TURNSTILE_SECRET_KEY) return res.status(503).json({error:'Quote requests are temporarily unavailable. Please try again later.'});
   try {
     const verify=await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secret:TURNSTILE_SECRET_KEY,response:b.turnstile_token})});
     const result=await verify.json();

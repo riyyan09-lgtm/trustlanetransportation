@@ -1,7 +1,7 @@
 module.exports=async function handler(req,res){
  res.setHeader('Cache-Control','no-store');if(req.method!=='POST')return res.status(405).json({error:'Method not allowed.'});
- const {SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY,SUPABASE_ANON_KEY}=process.env;const token=(req.headers.authorization||'').replace(/^Bearer\s+/i,'');
- if(!SUPABASE_URL||!SUPABASE_SERVICE_ROLE_KEY||!SUPABASE_ANON_KEY)return res.status(503).json({error:'Portal configuration is incomplete.'});
+ const {SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY}=process.env; const SUPABASE_ANON_KEY=process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;const token=(req.headers.authorization||'').replace(/^Bearer\s+/i,'');
+ if(SUPABASE_URL !== 'https://esevschvewgsvrisyixd.supabase.co'||!SUPABASE_SERVICE_ROLE_KEY||!SUPABASE_ANON_KEY)return res.status(503).json({error:'Portal configuration is incomplete.'});
  if(!token)return res.status(401).json({error:'Sign in required.'});
  try{
   const userRes=await fetch(`${SUPABASE_URL}/auth/v1/user`,{headers:{apikey:SUPABASE_ANON_KEY,Authorization:`Bearer ${token}`}});if(!userRes.ok)return res.status(401).json({error:'Session expired.'});const user=await userRes.json();
