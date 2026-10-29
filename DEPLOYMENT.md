@@ -2,7 +2,7 @@
 
 ## Current deployment state
 
-The Trustlane site and portal source are on the `trustlane-preview` branch of `riyyan09-lgtm/trustlanetransportation`. The Preview deployment URL is `https://trustlane-transportation-30q7rfhta-mr-development.vercel.app/`. Supabase URL, anon key, and service-role key are configured for Preview and Production using the existing values. **Preview points at the same Supabase project and data as Production. Do not submit test or sample quote requests through Preview.** Production deployment and custom-domain routing have not been changed.
+The Trustlane site and portal source are on the `trustlane-preview` branch of `riyyan09-lgtm/trustlanetransportation`. The current Preview deployment is available from the Vercel project dashboard. Supabase URL, anon key, and service-role key are configured for Preview and Production using the existing values. **Preview points at the same Supabase project and data as Production. Do not submit test or sample quote requests through Preview.** Production deployment and custom-domain routing have not been changed.
 
 The service-role key is used only by Vercel server functions. Do not place it in browser code, source control, or any `NEXT_PUBLIC_*` variable.
 
@@ -20,7 +20,7 @@ The quote form includes a hidden honeypot, request idempotency, server validatio
 
 ## First administrator and agents
 
-No Trustlane Auth user or portal profile exists yet for the administrator email. To create the first administrator without changing the chosen password:
+The first administrator profile has been created for the verified Auth user. To bootstrap an administrator in a new project:
 
 1. In the correct Supabase project, create the Auth user with the administrator email and the existing chosen password. Verify the email through Supabase's user management flow.
 2. Copy that user's UUID from **Authentication → Users**.
