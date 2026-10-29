@@ -20,5 +20,6 @@ $('#setup-form').onsubmit=async e=>{e.preventDefault();try{await api('/auth/v1/u
 
 async function agentAction(payload){const response=await fetch('/api/agents',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify(payload)});const data=await response.json();if(!response.ok)throw Error(data.error||'Request failed.');return data;}
 $('#invite-form').onsubmit=async e=>{e.preventDefault();try{await agentAction({action:'invite',...Object.fromEntries(new FormData(e.target))});e.target.reset();await load();msg.textContent='Agent invitation sent.'}catch(err){msg.textContent=err.message}};
+$('#create-agent-form').onsubmit=async e=>{e.preventDefault();const form=e.target;const button=form.querySelector('button');button.disabled=true;try{await agentAction({action:'create',...Object.fromEntries(new FormData(form))});form.reset();await load();msg.textContent='Agent account created.'}catch(err){msg.textContent=err.message}finally{button.disabled=false}};
 $('#agent-list').onclick=async e=>{const b=e.target.closest('[data-agent]');if(!b)return;try{await agentAction({action:b.dataset.active==='true'?'deactivate':'reactivate',user_id:b.dataset.agent});await load();msg.textContent='Agent access updated.'}catch(err){msg.textContent=err.message}};
 
