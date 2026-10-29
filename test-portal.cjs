@@ -16,7 +16,7 @@ async function openDashboard(role) {
     if (url.includes('trustlane_profiles?user_id=')) return reply([{ display_name: 'Test User', role, active: true }]);
     if (url.includes('trustlane_quote_requests')) return reply([{ id: 'lead-1', name: 'Test Lead', pickup: 'A', delivery: 'B', vehicle_make: 'Make', vehicle_model: 'Model', status: 'New', created_at: '2026-01-01' }]);
     if (url.includes('trustlane_notes')) return reply([]);
-    if (url.includes('trustlane_tasks')) return reply([{ id: 'task-1', title: '<Call customer>', due_on: '2026-11-01', completed: false }]);
+    if (url.includes('trustlane_tasks')) return reply([{ id: 'task-1', lead_id: 'lead-1', title: '<Call customer>', due_on: '2026-11-01', completed: false }]);
     if (url.includes('trustlane_profiles?role=eq.agent')) return reply([{ user_id: 'agent-1', display_name: '<Agent>', active: true }]);
     throw new Error('Unexpected endpoint: ' + url);
   };
@@ -41,6 +41,16 @@ test('agent does not see administrator team management', async () => {
   assert.equal(el('#dashboard').hidden, false);
   assert.equal(el('#agent-management').hidden, true);
   assert.equal(el('#stat-total').textContent, 1);
+});
+
+test('open follow-ups show the customer and safely open the lead', async () => {
+  const el = await openDashboard('agent');
+  assert.equal(el('#overview-count').textContent, '1 open');
+  assert.match(el('#task-overview').innerHTML, /&lt;Call customer&gt;/);
+  assert.match(el('#task-overview').innerHTML, /Test Lead/);
+  el('#task-overview').onclick({ target: { closest: () => ({ dataset: { lead: 'lead-1' } }) } });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.match(el('#detail').innerHTML, /Test Lead/);
 });
 
 test('lead detail renders escaped follow-up tasks', async () => {
