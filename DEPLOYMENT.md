@@ -2,7 +2,7 @@
 
 ## Current deployment state
 
-The Trustlane site and portal source are on the `trustlane-preview` branch of `riyyan09-lgtm/trustlanetransportation`. The current Preview deployment is available from the Vercel project dashboard. Supabase URL, anon key, and service-role key are configured for Preview and Production using the existing values. **Preview points at the same Supabase project and data as Production. Do not submit test or sample quote requests through Preview.** Production deployment and custom-domain routing have not been changed.
+The Trustlane site and portal source are on the `trustlane-preview` branch of `riyyan09-lgtm/trustlanetransportation`. The current Preview deployment is available from the Vercel project dashboard. The existing Supabase URL and service-role key are configured for Preview and Production. The portal uses the verified project publishable key; the legacy anon key configured in Vercel was malformed. **Preview points at the same Supabase project and data as Production. Do not submit test or sample quote requests through Preview.** Production deployment and custom-domain routing have not been changed.
 
 The service-role key is used only by Vercel server functions. Do not place it in browser code, source control, or any `NEXT_PUBLIC_*` variable.
 
@@ -11,7 +11,7 @@ The service-role key is used only by Vercel server functions. Do not place it in
 Required server variables:
 
 - `SUPABASE_URL`
-- `SUPABASE_ANON_KEY` (or existing `NEXT_PUBLIC_SUPABASE_ANON_KEY`)
+- `SUPABASE_PUBLISHABLE_KEY` (optional override for the portal's project-specific public key)
 - `SUPABASE_SERVICE_ROLE_KEY`
 
 `SITE_URL` is optional for basic password sign-in and quote submissions. Set it to the intended public domain before inviting agents so invite emails return to the correct portal URL. Supabase Auth email delivery also requires a configured SMTP provider and the portal URL in the Auth redirect allowlist.
