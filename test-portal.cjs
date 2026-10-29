@@ -60,5 +60,9 @@ test('lead detail renders escaped follow-up tasks', async () => {
   assert.match(el('#task-list').innerHTML, /&lt;Call customer&gt;/);
   assert.match(el('#task-list').innerHTML, /Complete/);
   assert.equal(typeof el('#task-form').onsubmit, 'function');
+  assert.match(el('#working-details').innerHTML, /Customer quote amount/);
+  assert.match(el('#working-details').innerHTML, /Carrier pay/);
+  assert.match(el('#working-details').innerHTML, /Working status/);
+  assert.equal(typeof el('#working-form').onsubmit, 'function');
 });
 
