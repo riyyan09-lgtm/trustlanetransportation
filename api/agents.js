@@ -1,6 +1,6 @@
 module.exports=async function handler(req,res){
  res.setHeader('Cache-Control','no-store');res.setHeader('X-Robots-Tag','noindex, nofollow');if(req.method!=='POST')return res.status(405).json({error:'Method not allowed.'});
- const {SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY}=process.env; const SUPABASE_ANON_KEY=process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;const token=(req.headers.authorization||'').replace(/^Bearer\s+/i,'');
+ const {SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY}=process.env; const SUPABASE_ANON_KEY=process.env.SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_x6MHLmvM9goxrQVGfWPsoA_-zz96zxb';const token=(req.headers.authorization||'').replace(/^Bearer\s+/i,'');
  if(SUPABASE_URL !== 'https://esevschvewgsvrisyixd.supabase.co'||!SUPABASE_SERVICE_ROLE_KEY||!SUPABASE_ANON_KEY)return res.status(503).json({error:'Portal configuration is incomplete.'});
  if(!token)return res.status(401).json({error:'Sign in required.'});
  try{
@@ -18,3 +18,4 @@ module.exports=async function handler(req,res){
   if(!created.ok)return res.status(500).json({error:'The Auth invitation was created, but portal access was not. Ask an administrator to check the profile before retrying.'});return res.status(200).json({success:true});
  }catch{return res.status(503).json({error:'Could not complete the request. Please try again.'});}
 };
+
