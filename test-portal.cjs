@@ -22,10 +22,12 @@ async function openDashboard(role) {
     if (url.includes('trustlane_profiles?role=eq.agent')) return reply([{ user_id: 'agent-1', display_name: '<Agent>', active: true }]);
     throw new Error('Unexpected endpoint: ' + url);
   };
-  const context = { document: { querySelector: s => el(s) }, fetch, FormData: class { *[Symbol.iterator]() { yield ['email', 'test@example.test']; yield ['password', 'test']; } }, URLSearchParams, location: { hash: '', pathname: '/portal.html' }, history: { replaceState() {} }, Date, console };
+  let downloaded = '';
+  const context = { document: { querySelector: s => el(s), createElement: () => ({ click() {} }) }, fetch, FormData: class { *[Symbol.iterator]() { yield ['email', 'test@example.test']; yield ['password', 'test']; } }, URLSearchParams, location: { hash: '', pathname: '/portal.html' }, history: { replaceState() {} }, Date, console, Blob: class { constructor(parts) { downloaded = parts.join(''); } }, URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} }, setTimeout: fn => fn() };
   vm.runInNewContext(fs.readFileSync('portal.js', 'utf8'), context);
   await new Promise(resolve => setImmediate(resolve));
   await el('#login-form').onsubmit({ preventDefault(){}, target: { reset(){} } });
+  el.downloaded = () => downloaded;
   return el;
 }
 
@@ -71,6 +73,9 @@ test('lead detail renders escaped follow-up tasks', async () => {
   assert.match(el('#quote-list').innerHTML, /mailto:test%40example.test/);
   assert.match(el('#quote-list').innerHTML, /%3Cterms%3E/);
   assert.equal(typeof el('#quote-form').onsubmit, 'function');
+  el('#quote-list').onclick({target:{closest:()=>({dataset:{quote:'quote-1'}})}});
+  assert.match(el.downloaded(), /&lt;terms&gt;/);
+  assert.doesNotMatch(el.downloaded(), /Carrier pay/);
 });
 
 test('pipeline view filters leads by stage', async () => {
