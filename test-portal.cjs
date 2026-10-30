@@ -10,7 +10,9 @@ async function openDashboard(role) {
     return els.get(id);
   };
   const reply = data => ({ ok: true, json: async () => data });
-  const fetch = async url => {
+  const requests = [];
+  const fetch = async (url, options) => {
+    requests.push({url, options});
     if (url === '/api/config') return reply({ supabaseUrl: 'https://example.test', supabaseAnonKey: 'public' });
     if (url.includes('/auth/v1/token')) return reply({ access_token: 'token', user: { id: 'user-1' } });
     if (url.includes('trustlane_profiles?user_id=')) return reply([{ display_name: 'Test User', role, active: true }]);
@@ -18,6 +20,8 @@ async function openDashboard(role) {
     if (url.includes('trustlane_notes')) return reply([]);
     if (url.includes('trustlane_lead_activity')) return reply([{ occurred_at: '2026-10-30T12:00:00Z', changes: { working_status: { from: 'New', to: '<Follow Up>' } } }]);
     if (url.includes('trustlane_quote_drafts')) return reply([{ id: 'quote-1', created_at: '2026-10-30T12:00:00Z', snapshot: { name:'Test Lead', pickup:'A', delivery:'B', quote_amount: 123.45, special_terms:'<terms>', additional_vehicles:[{year:2021,make:'Test',model:'Second'}] } }]);
+    if (url.includes('trustlane_orders')) return reply([]);
+    if (url.includes('rpc/trustlane_record_manual_order')) return reply('order-1');
     if (url.includes('trustlane_vehicles')) return reply([{id:'vehicle-1',year:2021,make:'Test',model:'<Second>',active:true}]);
     if (url.includes('trustlane_contact_events')) return reply([{kind:'Call',outcome:'<No answer>',details:'Follow up',created_at:'2026-10-30T12:00:00Z'}]);
     if (url.includes('trustlane_payment_records')) return reply([{kind:'Payment',amount:125,transaction_date:'2026-10-30',reference:'<ref>'}]);
@@ -26,11 +30,12 @@ async function openDashboard(role) {
     throw new Error('Unexpected endpoint: ' + url);
   };
   let downloaded = '';
-  const context = { document: { querySelector: s => el(s), createElement: () => ({ click() {} }) }, fetch, FormData: class { *[Symbol.iterator]() { yield ['email', 'test@example.test']; yield ['password', 'test']; } }, URLSearchParams, location: { hash: '', pathname: '/portal.html' }, history: { replaceState() {} }, Date, console, Blob: class { constructor(parts) { downloaded = parts.join(''); } }, URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} }, setTimeout: fn => fn() };
+  const context = { document: { querySelector: s => el(s), createElement: () => ({ click() {} }) }, fetch, FormData: class { constructor(form){this.values=form.values||{email:'test@example.test',password:'test'}} get(k){return this.values[k]??null} *[Symbol.iterator]() { yield* Object.entries(this.values); } }, URLSearchParams, location: { hash: '', pathname: '/portal.html' }, history: { replaceState() {} }, Date, console, Blob: class { constructor(parts) { downloaded = parts.join(''); } }, URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} }, setTimeout: fn => fn() };
   vm.runInNewContext(fs.readFileSync('portal.js', 'utf8'), context);
   await new Promise(resolve => setImmediate(resolve));
   await el('#login-form').onsubmit({ preventDefault(){}, target: { reset(){} } });
   el.downloaded = () => downloaded;
+  el.requests = requests;
   return el;
 }
 
@@ -41,6 +46,17 @@ test('administrator sees team management and lead summary with escaped agent nam
   assert.equal(el('#stat-total').textContent, 1);
   assert.equal(el('#stat-new').textContent, 1);
   assert.match(el('#agent-list').innerHTML, /&lt;Agent&gt;/);
+});
+
+test('manual order submits selected quote and explicit confirmation', async () => {
+  const el = await openDashboard('agent');
+  el('#leads').onclick({ target: { closest: () => ({ dataset: { id: 'lead-1' } }) } });
+  await new Promise(resolve => setImmediate(resolve));
+  const button={disabled:false};
+  await el('#order-create-form').onsubmit({preventDefault(){},target:{querySelector:()=>button,values:{quote_id:'quote-1',confirmation_note:'Customer agreed by phone',confirmed:'on'}}});
+  const request=el.requests.find(r=>r.url.includes('rpc/trustlane_record_manual_order'));
+  assert.deepEqual(JSON.parse(request.options.body),{p_lead_id:'lead-1',p_quote_id:'quote-1',p_confirmation_note:'Customer agreed by phone',p_confirmed:true});
+  assert.equal(button.disabled,false);
 });
 
 test('agent does not see administrator team management', async () => {
@@ -82,6 +98,8 @@ test('lead detail renders escaped follow-up tasks', async () => {
   assert.match(el('#quote-list').innerHTML, /mailto:test%40example.test/);
   assert.match(el('#quote-list').innerHTML, /%3Cterms%3E/);
   assert.equal(typeof el('#quote-form').onsubmit, 'function');
+  assert.match(el('#order-content').innerHTML, /confirmed the customer agreed/);
+  assert.equal(typeof el('#order-create-form').onsubmit, 'function');
   el('#quote-list').onclick({target:{closest:()=>({dataset:{quote:'quote-1'}})}});
   assert.match(el.downloaded(), /&lt;terms&gt;/);
   assert.match(el.downloaded(), /2021 Test Second/);
