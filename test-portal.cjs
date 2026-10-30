@@ -16,6 +16,7 @@ async function openDashboard(role) {
     if (url.includes('trustlane_profiles?user_id=')) return reply([{ display_name: 'Test User', role, active: true }]);
     if (url.includes('trustlane_quote_requests')) return reply([{ id: 'lead-1', name: 'Test Lead', pickup: 'A', delivery: 'B', vehicle_make: 'Make', vehicle_model: 'Model', status: 'New', created_at: '2026-01-01' }]);
     if (url.includes('trustlane_notes')) return reply([]);
+    if (url.includes('trustlane_lead_activity')) return reply([{ occurred_at: '2026-10-30T12:00:00Z', changes: { working_status: { from: 'New', to: '<Follow Up>' } } }]);
     if (url.includes('trustlane_tasks')) return reply([{ id: 'task-1', lead_id: 'lead-1', title: '<Call customer>', due_on: '2026-11-01', completed: false }]);
     if (url.includes('trustlane_profiles?role=eq.agent')) return reply([{ user_id: 'agent-1', display_name: '<Agent>', active: true }]);
     throw new Error('Unexpected endpoint: ' + url);
@@ -64,5 +65,13 @@ test('lead detail renders escaped follow-up tasks', async () => {
   assert.match(el('#working-details').innerHTML, /Carrier pay/);
   assert.match(el('#working-details').innerHTML, /Working status/);
   assert.equal(typeof el('#working-form').onsubmit, 'function');
+  assert.match(el('#activity-list').innerHTML, /&lt;Follow Up&gt;/);
 });
 
+test('pipeline view filters leads by stage', async () => {
+  const el = await openDashboard('agent');
+  el('#pipeline').value = 'quotes'; el('#pipeline').onchange();
+  assert.equal(el('#lead-count').textContent, '0 shown');
+  el('#pipeline').value = 'leads'; el('#pipeline').onchange();
+  assert.equal(el('#lead-count').textContent, '1 shown');
+});
