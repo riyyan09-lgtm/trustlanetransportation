@@ -17,7 +17,8 @@ async function openDashboard(role) {
     if (url.includes('trustlane_quote_requests')) return reply([{ id: 'lead-1', name: 'Test Lead', email:'test@example.test', pickup: 'A', delivery: 'B', vehicle_make: 'Make', vehicle_model: 'Model', status: 'New', created_at: '2026-01-01' }]);
     if (url.includes('trustlane_notes')) return reply([]);
     if (url.includes('trustlane_lead_activity')) return reply([{ occurred_at: '2026-10-30T12:00:00Z', changes: { working_status: { from: 'New', to: '<Follow Up>' } } }]);
-    if (url.includes('trustlane_quote_drafts')) return reply([{ id: 'quote-1', created_at: '2026-10-30T12:00:00Z', snapshot: { name:'Test Lead', pickup:'A', delivery:'B', quote_amount: 123.45, special_terms:'<terms>' } }]);
+    if (url.includes('trustlane_quote_drafts')) return reply([{ id: 'quote-1', created_at: '2026-10-30T12:00:00Z', snapshot: { name:'Test Lead', pickup:'A', delivery:'B', quote_amount: 123.45, special_terms:'<terms>', additional_vehicles:[{year:2021,make:'Test',model:'Second'}] } }]);
+    if (url.includes('trustlane_vehicles')) return reply([{id:'vehicle-1',year:2021,make:'Test',model:'<Second>',active:true}]);
     if (url.includes('trustlane_tasks')) return reply([{ id: 'task-1', lead_id: 'lead-1', title: '<Call customer>', due_on: '2026-11-01', completed: false }]);
     if (url.includes('trustlane_profiles?role=eq.agent')) return reply([{ user_id: 'agent-1', display_name: '<Agent>', active: true }]);
     throw new Error('Unexpected endpoint: ' + url);
@@ -68,6 +69,8 @@ test('lead detail renders escaped follow-up tasks', async () => {
   assert.match(el('#working-details').innerHTML, /Carrier pay/);
   assert.match(el('#working-details').innerHTML, /Working status/);
   assert.equal(typeof el('#working-form').onsubmit, 'function');
+  assert.match(el('#vehicle-list').innerHTML, /&lt;Second&gt;/);
+  assert.equal(typeof el('#vehicle-add').onsubmit, 'function');
   assert.match(el('#activity-list').innerHTML, /&lt;Follow Up&gt;/);
   assert.match(el('#quote-list').innerHTML, /123\.45/);
   assert.match(el('#quote-list').innerHTML, /mailto:test%40example.test/);
@@ -75,6 +78,7 @@ test('lead detail renders escaped follow-up tasks', async () => {
   assert.equal(typeof el('#quote-form').onsubmit, 'function');
   el('#quote-list').onclick({target:{closest:()=>({dataset:{quote:'quote-1'}})}});
   assert.match(el.downloaded(), /&lt;terms&gt;/);
+  assert.match(el.downloaded(), /2021 Test Second/);
   assert.doesNotMatch(el.downloaded(), /Carrier pay/);
 });
 
