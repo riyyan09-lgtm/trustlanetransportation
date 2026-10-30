@@ -75,3 +75,9 @@ test('pipeline view filters leads by stage', async () => {
   el('#pipeline').value = 'leads'; el('#pipeline').onchange();
   assert.equal(el('#lead-count').textContent, '1 shown');
 });
+
+test('manual lead entry is available to an agent', async () => {
+  const el = await openDashboard('agent');
+  assert.equal(typeof el('#manual-lead-form').onsubmit, 'function');
+  assert.match(fs.readFileSync('portal.html', 'utf8'), /name="vehicle_year"/);
+});
