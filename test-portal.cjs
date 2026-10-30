@@ -6,10 +6,12 @@ const fs = require('node:fs');
 async function openDashboard(role, existingOrder=false) {
   const els = new Map();
   const el = id => {
-    if (!els.has(id)) els.set(id, { hidden: true, textContent: '', innerHTML: '', value: '', reset() {} });
+    if (!els.has(id)) els.set(id, { hidden: true, textContent: '', innerHTML: '', value: '', reset() {},classList:{add(){},remove(){}} });
     return els.get(id);
   };
   const reply = data => ({ ok: true, json: async () => data });
+  const panels=['overview','shipment','vehicles','quotes','order','activity','payment','contact','tasks','notes'].map(name=>({dataset:{detailPanel:name},hidden:false}));
+  const tabs=panels.map(p=>({dataset:{detailTab:p.dataset.detailPanel},setAttribute(k,v){this[k]=v}}));
   const requests = [];
   const fetch = async (url, options) => {
     requests.push({url, options});
@@ -31,12 +33,13 @@ async function openDashboard(role, existingOrder=false) {
     throw new Error('Unexpected endpoint: ' + url);
   };
   let downloaded = '';
-  const context = { document: { querySelector: s => el(s), createElement: () => ({ click() {} }) }, fetch, FormData: class { constructor(form){this.values=form.values||{email:'test@example.test',password:'test'}} get(k){return this.values[k]??null} *[Symbol.iterator]() { yield* Object.entries(this.values); } }, URLSearchParams, location: { hash: '', pathname: '/portal.html' }, history: { replaceState() {} }, Date, console, Blob: class { constructor(parts) { downloaded = parts.join(''); } }, URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} }, setTimeout: fn => fn() };
+  const context = { document: { querySelector: s => el(s),querySelectorAll: s => s.includes('data-detail-panel')?panels:tabs, createElement: () => ({ click() {} }) }, fetch, FormData: class { constructor(form){this.values=form.values||{email:'test@example.test',password:'test'}} get(k){return this.values[k]??null} *[Symbol.iterator]() { yield* Object.entries(this.values); } }, URLSearchParams, location: { hash: '', pathname: '/portal.html' }, history: { replaceState() {} }, Date, console, Blob: class { constructor(parts) { downloaded = parts.join(''); } }, URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} }, setTimeout: fn => fn() };
   vm.runInNewContext(fs.readFileSync('portal.js', 'utf8'), context);
   await new Promise(resolve => setImmediate(resolve));
   await el('#login-form').onsubmit({ preventDefault(){}, target: { reset(){} } });
   el.downloaded = () => downloaded;
   el.requests = requests;
+  el.panels = panels; el.tabs = tabs;
   return el;
 }
 
@@ -84,6 +87,8 @@ test('open follow-ups show the customer and safely open the lead', async () => {
   el('#task-overview').onclick({ target: { closest: () => ({ dataset: { lead: 'lead-1' } }) } });
   await new Promise(resolve => setImmediate(resolve));
   assert.match(el('#detail').innerHTML, /Test Lead/);
+  assert.match(el('#detail').innerHTML, /data-detail-tab="vehicles"/);
+  assert.match(el('#detail').innerHTML, /data-detail-panel="order"/);
 });
 
 test('lead detail renders escaped follow-up tasks', async () => {
@@ -127,6 +132,17 @@ test('pipeline view filters leads by stage', async () => {
   el('#pipeline-nav').onclick({target:{closest:()=>({dataset:{view:'orders'}})}});
   assert.equal(el('#inbox-title').textContent, 'Orders');
   assert.equal(el('#lead-count').textContent, '0 shown');
+});
+
+test('lead workspace switches between panels without hiding the selected panel', async () => {
+  const el=await openDashboard('agent');
+  el('#leads').onclick({target:{closest:()=>({dataset:{id:'lead-1'}})}});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(el.panels.find(p=>p.dataset.detailPanel==='overview').hidden,false);
+  el('#detail').onclick({target:{closest:s=>s==='#detail-close'?null:{dataset:{detailTab:'vehicles'}}}});
+  assert.equal(el.panels.find(p=>p.dataset.detailPanel==='vehicles').hidden,false);
+  assert.equal(el.panels.find(p=>p.dataset.detailPanel==='overview').hidden,true);
+  assert.equal(el.tabs.find(t=>t.dataset.detailTab==='vehicles')['aria-pressed'],'true');
 });
 
 test('filters work by email and route', async () => {
