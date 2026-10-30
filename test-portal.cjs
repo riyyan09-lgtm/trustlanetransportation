@@ -84,6 +84,19 @@ test('pipeline view filters leads by stage', async () => {
   assert.equal(el('#lead-count').textContent, '0 shown');
   el('#pipeline').value = 'leads'; el('#pipeline').onchange();
   assert.equal(el('#lead-count').textContent, '1 shown');
+  assert.equal(el('#inbox-title').textContent, 'Leads');
+  assert.match(el('#pipeline-nav').innerHTML, /Quotes/);
+  el('#pipeline-nav').onclick({target:{closest:()=>({dataset:{view:'orders'}})}});
+  assert.equal(el('#inbox-title').textContent, 'Orders');
+  assert.equal(el('#lead-count').textContent, '0 shown');
+});
+
+test('filters work by email and route', async () => {
+  const el = await openDashboard('agent');
+  el('#search').value='test@example.test'; el('#search').oninput();
+  assert.equal(el('#lead-count').textContent,'1 shown');
+  el('#pickup-filter').value='other'; el('#pickup-filter').oninput();
+  assert.equal(el('#lead-count').textContent,'0 shown');
 });
 
 test('manual lead entry is available to an agent', async () => {
