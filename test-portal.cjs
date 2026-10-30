@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const fs = require('node:fs');
 
-async function openDashboard(role) {
+async function openDashboard(role, existingOrder=false) {
   const els = new Map();
   const el = id => {
     if (!els.has(id)) els.set(id, { hidden: true, textContent: '', innerHTML: '', value: '', reset() {} });
@@ -20,7 +20,8 @@ async function openDashboard(role) {
     if (url.includes('trustlane_notes')) return reply([]);
     if (url.includes('trustlane_lead_activity')) return reply([{ occurred_at: '2026-10-30T12:00:00Z', changes: { working_status: { from: 'New', to: '<Follow Up>' } } }]);
     if (url.includes('trustlane_quote_drafts')) return reply([{ id: 'quote-1', created_at: '2026-10-30T12:00:00Z', snapshot: { name:'Test Lead', pickup:'A', delivery:'B', quote_amount: 123.45, special_terms:'<terms>', additional_vehicles:[{year:2021,make:'Test',model:'Second'}] } }]);
-    if (url.includes('trustlane_orders')) return reply([]);
+    if (url.includes('trustlane_order_events')) return reply([{created_at:'2026-10-30T12:00:00Z',previous_stage:'Dispatched',new_stage:'<Picked up>'}]);
+    if (url.includes('trustlane_orders')) return reply(existingOrder?[{id:'order-1',stage:'Dispatched',created_at:'2026-10-30T12:00:00Z',confirmation_note:'<Agreed>'}]:[]);
     if (url.includes('rpc/trustlane_record_manual_order')) return reply('order-1');
     if (url.includes('trustlane_vehicles')) return reply([{id:'vehicle-1',year:2021,make:'Test',model:'<Second>',active:true}]);
     if (url.includes('trustlane_contact_events')) return reply([{kind:'Call',outcome:'<No answer>',details:'Follow up',created_at:'2026-10-30T12:00:00Z'}]);
@@ -57,6 +58,15 @@ test('manual order submits selected quote and explicit confirmation', async () =
   const request=el.requests.find(r=>r.url.includes('rpc/trustlane_record_manual_order'));
   assert.deepEqual(JSON.parse(request.options.body),{p_lead_id:'lead-1',p_quote_id:'quote-1',p_confirmation_note:'Customer agreed by phone',p_confirmed:true});
   assert.equal(button.disabled,false);
+});
+
+test('order view shows escaped agreement and stage history', async () => {
+  const el = await openDashboard('agent',true);
+  el('#leads').onclick({target:{closest:()=>({dataset:{id:'lead-1'}})}});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.match(el('#order-content').innerHTML,/&lt;Agreed&gt;/);
+  assert.match(el('#order-history').innerHTML,/&lt;Picked up&gt;/);
+  assert.equal(typeof el('#order-stage-form').onsubmit,'function');
 });
 
 test('agent does not see administrator team management', async () => {

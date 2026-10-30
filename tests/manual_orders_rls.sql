@@ -23,11 +23,13 @@ do $$ begin
  if not exists(select 1 from public.trustlane_quote_requests where id='cccccccc-cccc-4ccc-cccc-cccccccccccc' and status='Booked') then raise exception 'Lead not booked after order'; end if;
  perform public.trustlane_update_order_stage((select order_id from order_test_ids),'Picked up');
  if not exists(select 1 from public.trustlane_orders where id=(select order_id from order_test_ids) and stage='Picked up') then raise exception 'Stage update failed'; end if;
+ if (select count(*) from public.trustlane_order_events where order_id=(select order_id from order_test_ids))<>2 then raise exception 'Order history missing'; end if;
  begin perform public.trustlane_record_manual_order('cccccccc-cccc-4ccc-cccc-cccccccccccc',(select quote_id from order_test_ids),'Duplicate test',true); raise exception 'Duplicate order allowed'; exception when unique_violation then null; end;
 end $$;
 select set_config('request.jwt.claim.sub','bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',true);
 do $$ begin
  if exists(select 1 from public.trustlane_orders where lead_id='cccccccc-cccc-4ccc-cccc-cccccccccccc') then raise exception 'Other agent can read order'; end if;
+ if exists(select 1 from public.trustlane_order_events where order_id=(select order_id from order_test_ids)) then raise exception 'Other agent can read order history'; end if;
  begin perform public.trustlane_update_order_stage((select order_id from order_test_ids),'Delivered'); raise exception 'Other agent can update order'; exception when insufficient_privilege then null; end;
 end $$;
 rollback;
