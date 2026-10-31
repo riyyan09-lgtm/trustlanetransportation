@@ -10,7 +10,7 @@ async function openDashboard(role, existingOrder=false) {
     return els.get(id);
   };
   const reply = data => ({ ok: true, json: async () => data });
-  const panels=['overview','shipment','vehicles','quotes','order','activity','payment','contact','tasks','notes'].map(name=>({dataset:{detailPanel:name},hidden:false}));
+  const panels=['overview','shipment','vehicles','quotes','booking','order','activity','payment','contact','tasks','notes'].map(name=>({dataset:{detailPanel:name},hidden:false}));
   const tabs=panels.map(p=>({dataset:{detailTab:p.dataset.detailPanel},setAttribute(k,v){this[k]=v}}));
   const requests = [];
   const fetch = async (url, options) => {
@@ -23,8 +23,11 @@ async function openDashboard(role, existingOrder=false) {
     if (url.includes('trustlane_lead_activity')) return reply([{ occurred_at: '2026-10-30T12:00:00Z', changes: { working_status: { from: 'New', to: '<Follow Up>' } } }]);
     if (url.includes('trustlane_quote_drafts')) return reply([{ id: 'quote-1', created_at: '2026-10-30T12:00:00Z', snapshot: { name:'Test Lead', pickup:'A', delivery:'B', quote_amount: 123.45, special_terms:'<terms>', additional_vehicles:[{year:2021,make:'Test',model:'Second'}] } }]);
     if (url.includes('trustlane_order_events')) return reply([{created_at:'2026-10-30T12:00:00Z',previous_stage:'Dispatched',new_stage:'<Picked up>'}]);
+    if (url.includes('trustlane_invoices')) return reply([{id:'12345678-invoice',issued_on:'2026-10-30',snapshot:{name:'<Customer>',quote_amount:123.45,vehicle_make:'Test',carrier_pay:75}}]);
+    if (url.includes('trustlane_signatures')) return reply([]);
     if (url.includes('trustlane_orders')) return reply(existingOrder?[{id:'order-1',stage:'Dispatched',created_at:'2026-10-30T12:00:00Z',confirmation_note:'<Agreed>'}]:[]);
     if (url.includes('rpc/trustlane_record_manual_order')) return reply('order-1');
+    if (url.includes('rpc/trustlane_issue_booking_link')) return reply('link-1');
     if (url.includes('trustlane_vehicles')) return reply([{id:'vehicle-1',year:2021,make:'Test',model:'<Second>',active:true}]);
     if (url.includes('trustlane_contact_events')) return reply([{kind:'Call',outcome:'<No answer>',details:'Follow up',created_at:'2026-10-30T12:00:00Z'}]);
     if (url.includes('trustlane_payment_records')) return reply([{kind:'Payment',amount:125,transaction_date:'2026-10-30',reference:'<ref>'}]);
@@ -33,7 +36,7 @@ async function openDashboard(role, existingOrder=false) {
     throw new Error('Unexpected endpoint: ' + url);
   };
   let downloaded = '';
-  const context = { document: { querySelector: s => el(s),querySelectorAll: s => s.includes('data-detail-panel')?panels:tabs, createElement: () => ({ click() {} }) }, fetch, FormData: class { constructor(form){this.values=form.values||{email:'test@example.test',password:'test'}} get(k){return this.values[k]??null} *[Symbol.iterator]() { yield* Object.entries(this.values); } }, URLSearchParams, location: { hash: '', pathname: '/portal.html' }, history: { replaceState() {} }, Date, console, Blob: class { constructor(parts) { downloaded = parts.join(''); } }, URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} }, setTimeout: fn => fn() };
+  const context = { document: { querySelector: s => el(s),querySelectorAll: s => s.includes('data-detail-panel')?panels:tabs, createElement: () => ({ click() {} }) }, fetch, FormData: class { constructor(form){this.values=form.values||{email:'test@example.test',password:'test'}} get(k){return this.values[k]??null} *[Symbol.iterator]() { yield* Object.entries(this.values); } }, URLSearchParams, location: { hash: '', pathname: '/portal.html',origin:'https://example.test' }, history: { replaceState() {} }, Date, console, crypto:require('node:crypto').webcrypto,TextEncoder,Blob: class { constructor(parts) { downloaded = parts.join(''); } }, URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} }, setTimeout: fn => fn() };
   vm.runInNewContext(fs.readFileSync('portal.js', 'utf8'), context);
   await new Promise(resolve => setImmediate(resolve));
   await el('#login-form').onsubmit({ preventDefault(){}, target: { reset(){} } });
@@ -70,6 +73,24 @@ test('order view shows escaped agreement and stage history', async () => {
   assert.match(el('#order-content').innerHTML,/&lt;Agreed&gt;/);
   assert.match(el('#order-history').innerHTML,/&lt;Picked up&gt;/);
   assert.equal(typeof el('#order-stage-form').onsubmit,'function');
+  assert.match(el('#invoice-list').innerHTML,/12345678/);
+  el('#invoice-list').onclick({target:{closest:()=>({dataset:{invoice:'12345678-invoice'}})}});
+  assert.match(el.downloaded(),/&lt;Customer&gt;/);
+  assert.doesNotMatch(el.downloaded(),/Carrier pay/);
+});
+
+test('booking link uses a random fragment and only sends its hash to Supabase', async () => {
+  const el=await openDashboard('agent');
+  el('#leads').onclick({target:{closest:()=>({dataset:{id:'lead-1'}})}});
+  await new Promise(resolve=>setImmediate(resolve));
+  const button={disabled:false};
+  await el('#booking-issue-form').onsubmit({preventDefault(){},target:{querySelector:()=>button,values:{quote_id:'quote-1'}}});
+  const link=el('#booking-link').value;const token=link.split('#')[1];
+  assert.match(link,/^https:\/\/example\.test\/booking\.html#[a-f0-9]{64}$/);
+  const call=el.requests.find(r=>r.url.includes('rpc/trustlane_issue_booking_link'));
+  const body=JSON.parse(call.options.body);
+  assert.equal(body.p_token_hash,require('node:crypto').createHash('sha256').update(token).digest('hex'));
+  assert.notEqual(body.p_token_hash,token);
 });
 
 test('agent does not see administrator team management', async () => {
@@ -112,6 +133,8 @@ test('lead detail renders escaped follow-up tasks', async () => {
   assert.match(el('#quote-list').innerHTML, /123\.45/);
   assert.match(el('#quote-list').innerHTML, /mailto:test%40example.test/);
   assert.match(el('#quote-list').innerHTML, /%3Cterms%3E/);
+  assert.match(el('#booking-status').textContent,/No signed agreement/);
+  assert.equal(typeof el('#booking-issue-form').onsubmit,'function');
   assert.equal(typeof el('#quote-form').onsubmit, 'function');
   assert.match(el('#order-content').innerHTML, /confirmed the customer agreed/);
   assert.equal(typeof el('#order-create-form').onsubmit, 'function');

@@ -1,0 +1,13 @@
+const {createHash}=require('node:crypto');
+module.exports=async function handler(req,res){
+ res.setHeader('Cache-Control','no-store');res.setHeader('X-Robots-Tag','noindex, nofollow');res.setHeader('Referrer-Policy','no-referrer');
+ if(req.method!=='POST')return res.status(405).json({error:'Method not allowed.'});
+ const b=req.body;if(!b||typeof b!=='object'||JSON.stringify(b).length>5000||!/^[a-f0-9]{64}$/.test(b.token||''))return res.status(400).json({error:'Invalid booking request.'});
+ const {SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY}=process.env;
+ if(SUPABASE_URL!=='https://esevschvewgsvrisyixd.supabase.co'||!SUPABASE_SERVICE_ROLE_KEY)return res.status(503).json({error:'Booking is temporarily unavailable.'});
+ const hash=createHash('sha256').update(b.token,'utf8').digest('hex');let path,body;
+ if(b.action==='view'){path='trustlane_public_booking_view';body={p_token_hash:hash};}
+ else if(b.action==='sign'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(b.terms_id||'')&&b.agreed===true&&typeof b.name==='string'&&b.name.trim().length>=2&&b.name.length<=120&&typeof b.pickup_address==='string'&&b.pickup_address.trim().length>=6&&b.pickup_address.length<=300&&typeof b.delivery_address==='string'&&b.delivery_address.trim().length>=6&&b.delivery_address.length<=300){path='trustlane_public_sign_booking';body={p_token_hash:hash,p_terms_id:b.terms_id,p_name:b.name.trim(),p_pickup_address:b.pickup_address.trim(),p_delivery_address:b.delivery_address.trim(),p_agreed:true};}
+ else return res.status(400).json({error:'Please complete all required fields and accept the agreement.'});
+ try{const headers={apikey:SUPABASE_SERVICE_ROLE_KEY,Authorization:`Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,'Content-Type':'application/json'};const ip=String(req.headers['x-real-ip']||req.headers['x-forwarded-for']||'unknown').split(',')[0].trim().slice(0,100)||'unknown';const limit=await fetch(`${SUPABASE_URL}/rest/v1/rpc/trustlane_accept_booking`,{method:'POST',headers,body:JSON.stringify({p_key:ip})});if(!limit.ok)throw Error('rate check failed');if(await limit.json()!==true)return res.status(429).json({error:'Too many attempts. Please wait and try again.'});const r=await fetch(`${SUPABASE_URL}/rest/v1/rpc/${path}`,{method:'POST',headers,body:JSON.stringify(body)});const data=await r.json();if(!r.ok)return res.status(400).json({error:'This link is unavailable or the shipment has changed. Please contact your agent for a new link.'});return res.status(200).json(data)}catch{return res.status(503).json({error:'Booking is temporarily unavailable. Please try again.'});}
+};

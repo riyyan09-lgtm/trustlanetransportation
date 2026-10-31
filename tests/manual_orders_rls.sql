@@ -10,7 +10,7 @@ insert into public.trustlane_quote_requests(id,request_id,name,email,phone,picku
  values ('cccccccc-cccc-4ccc-cccc-cccccccccccc',gen_random_uuid(),'TEST ORDER','test@example.invalid','5555550100','Test pickup','Test delivery',2020,'Test','Vehicle',current_date,'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',900);
 set local role authenticated;
 select set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',true);
-create temp table order_test_ids(quote_id uuid,order_id uuid);
+create temp table order_test_ids(quote_id uuid,order_id uuid,invoice_id uuid);
 insert into order_test_ids(quote_id) select public.trustlane_create_quote_draft('cccccccc-cccc-4ccc-cccc-cccccccccccc');
 do $$ begin
  begin perform public.trustlane_update_lead('cccccccc-cccc-4ccc-cccc-cccccccccccc','Booked',null,null,false); raise exception 'Book without order allowed';
@@ -19,17 +19,21 @@ do $$ begin
  exception when raise_exception then if sqlerrm='Order without confirmation allowed' then raise; end if; end;
 end $$;
 update order_test_ids set order_id=public.trustlane_record_manual_order('cccccccc-cccc-4ccc-cccc-cccccccccccc',quote_id,'TEST customer agreed',true);
+update order_test_ids set invoice_id=public.trustlane_create_invoice(order_id,null);
 do $$ begin
  if not exists(select 1 from public.trustlane_quote_requests where id='cccccccc-cccc-4ccc-cccc-cccccccccccc' and status='Booked') then raise exception 'Lead not booked after order'; end if;
  perform public.trustlane_update_order_stage((select order_id from order_test_ids),'Picked up');
  if not exists(select 1 from public.trustlane_orders where id=(select order_id from order_test_ids) and stage='Picked up') then raise exception 'Stage update failed'; end if;
  if (select count(*) from public.trustlane_order_events where order_id=(select order_id from order_test_ids))<>2 then raise exception 'Order history missing'; end if;
+ if not exists(select 1 from public.trustlane_invoices where id=(select invoice_id from order_test_ids) and snapshot->>'quote_amount'='900.00') then raise exception 'Invoice snapshot failed'; end if;
  begin perform public.trustlane_record_manual_order('cccccccc-cccc-4ccc-cccc-cccccccccccc',(select quote_id from order_test_ids),'Duplicate test',true); raise exception 'Duplicate order allowed'; exception when unique_violation then null; end;
 end $$;
 select set_config('request.jwt.claim.sub','bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',true);
 do $$ begin
  if exists(select 1 from public.trustlane_orders where lead_id='cccccccc-cccc-4ccc-cccc-cccccccccccc') then raise exception 'Other agent can read order'; end if;
  if exists(select 1 from public.trustlane_order_events where order_id=(select order_id from order_test_ids)) then raise exception 'Other agent can read order history'; end if;
+ if exists(select 1 from public.trustlane_invoices where id=(select invoice_id from order_test_ids)) then raise exception 'Other agent can read invoice'; end if;
+ begin perform public.trustlane_create_invoice((select order_id from order_test_ids),null); raise exception 'Other agent can create invoice'; exception when insufficient_privilege then null; end;
  begin perform public.trustlane_update_order_stage((select order_id from order_test_ids),'Delivered'); raise exception 'Other agent can update order'; exception when insufficient_privilege then null; end;
 end $$;
 rollback;

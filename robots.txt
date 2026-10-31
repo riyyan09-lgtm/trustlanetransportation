@@ -1,5 +1,6 @@
 User-agent: *
 Allow: /
 Disallow: /portal.html
+Disallow: /booking.html
 Disallow: /api/
 Sitemap: https://trustlanetransportation.com/sitemap.xml
