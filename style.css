@@ -17,3 +17,5 @@
 
 .contact-actions button{border:1px solid #cbd9c7;border-radius:5px;padding:8px 12px;background:#fff;color:#183a40;font-size:13px;font-weight:700}.contact-actions button:hover{background:#edf4e8}#template-dialog{width:min(620px,calc(100% - 32px));max-height:calc(100dvh - 32px);overflow:auto;border:1px solid #cbd9c7;border-radius:10px;padding:24px;color:#183a40;box-shadow:0 16px 80px #152b3255}#template-dialog::backdrop{background:#102328aa}.template-heading,.template-actions{display:flex;justify-content:space-between;align-items:center;gap:10px}.template-heading h3{margin:0}.template-actions{justify-content:flex-start;flex-wrap:wrap}#template-dialog textarea{width:100%;min-height:180px}#template-dialog label{display:block;margin:14px 0}#template-dialog button{min-height:44px;padding:8px 14px}#template-notice{min-height:1.5em}
 
+.remember-login{display:flex!important;align-items:center;gap:10px}.remember-login input{width:auto!important;margin:0}#template-dialog input,#template-dialog select{width:100%}
+
