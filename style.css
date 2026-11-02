@@ -19,3 +19,5 @@
 
 .remember-login{display:flex!important;align-items:center;gap:10px}.remember-login input{width:auto!important;margin:0}#template-dialog input,#template-dialog select{width:100%}
 
+.detail-message:not(:empty){flex:none;padding:8px 12px;margin-top:8px;border-radius:5px;background:#edf4e8;color:#183a40;font-weight:600;overflow-wrap:anywhere}.detail-message:empty{display:none}
+
