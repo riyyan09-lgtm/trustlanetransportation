@@ -1,11 +1,11 @@
-const button = document.querySelector('.menu');
+﻿const button = document.querySelector('.menu');
 const nav = document.querySelector('#navigation');
 button.addEventListener('click', () => { const open = button.getAttribute('aria-expanded') === 'true'; button.setAttribute('aria-expanded', String(!open)); nav.classList.toggle('open', !open); });
 nav.addEventListener('click', e => { if (e.target.closest('a')) { nav.classList.remove('open'); button.setAttribute('aria-expanded', 'false'); } });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && nav.classList.contains('open')) { nav.classList.remove('open'); button.setAttribute('aria-expanded', 'false'); button.focus(); } });
 const form = document.querySelector('#quote-form');
 let widget, requestId = crypto.randomUUID();
-form.addEventListener('submit', async e => {
+if (form) form.addEventListener('submit', async e => {
   e.preventDefault(); if (!form.reportValidity()) return;
   const result=document.querySelector('#quote-result'), button=form.querySelector('button');
   button.disabled=true; result.textContent='Sending your request…';
