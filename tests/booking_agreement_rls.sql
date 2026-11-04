@@ -11,14 +11,16 @@ select set_config('test.quote',public.trustlane_create_quote_draft('cccccccc-ccc
 select public.trustlane_issue_booking_link('cccccccc-cccc-4ccc-cccc-cccccccccccc',current_setting('test.quote')::uuid,repeat('1',64));
 do $$ begin
  begin perform public.trustlane_public_booking_view(repeat('1',64)); raise exception 'Authenticated user could call service function'; exception when insufficient_privilege then null; end;
+ begin perform public.trustlane_public_sign_booking_with_ip(repeat('1',64),current_setting('test.terms')::uuid,'Test signer','123 Test pickup','456 Test delivery',true,'203.0.113.8'::inet); raise exception 'Authenticated user could call IP signing function'; exception when insufficient_privilege then null; end;
 end $$;
 set local role service_role;
 do $$ begin
+ begin perform public.trustlane_public_sign_booking_with_ip(repeat('1',64),current_setting('test.terms')::uuid,'Test signer','123 Test pickup','456 Test delivery',true,null); raise exception 'Signing with no IP allowed'; exception when raise_exception then if sqlerrm='Signing with no IP allowed' then raise; end if; end;
  for n in 1..60 loop if not public.trustlane_accept_booking('booking-test-only') then raise exception 'Rate limit blocked too early'; end if; end loop;
  if public.trustlane_accept_booking('booking-test-only') then raise exception 'Rate limit did not block'; end if;
  if public.trustlane_public_booking_view(repeat('1',64))->>'state'<>'ready' then raise exception 'Link view failed'; end if;
  begin perform public.trustlane_public_sign_booking(repeat('1',64),current_setting('test.terms')::uuid,'Test signer','123 Test pickup','456 Test delivery',false); raise exception 'Signature without consent allowed'; exception when raise_exception then if sqlerrm='Signature without consent allowed' then raise; end if; end;
- if (public.trustlane_public_sign_booking(repeat('1',64),current_setting('test.terms')::uuid,'Test signer','123 Test pickup','456 Test delivery',true)->>'success')::boolean is not true then raise exception 'Signing failed'; end if;
+ if (public.trustlane_public_sign_booking_with_ip(repeat('1',64),current_setting('test.terms')::uuid,'Test signer','123 Test pickup','456 Test delivery',true,'203.0.113.8'::inet)->>'success')::boolean is not true then raise exception 'Signing failed'; end if;
  begin perform public.trustlane_public_sign_booking(repeat('1',64),current_setting('test.terms')::uuid,'Test signer','123 Test pickup','456 Test delivery',true); raise exception 'Replay allowed'; exception when raise_exception then if sqlerrm='Replay allowed' then raise; end if; end;
 end $$;
 set local role authenticated;
@@ -26,7 +28,7 @@ select set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa'
 do $$ begin
  if not exists(select 1 from public.trustlane_quote_requests where id='cccccccc-cccc-4ccc-cccc-cccccccccccc' and status='Booked' and contract_version=signed_contract_version) then raise exception 'Signed lead not booked'; end if;
  if (select count(*) from public.trustlane_orders where lead_id='cccccccc-cccc-4ccc-cccc-cccccccccccc')<>1 then raise exception 'Signed order missing'; end if;
- if not exists(select 1 from public.trustlane_signatures where lead_id='cccccccc-cccc-4ccc-cccc-cccccccccccc' and signed_snapshot->>'pickup_address'='123 Test pickup' and agreement_body like 'TEST TERMS%') then raise exception 'Signature snapshot missing'; end if;
+ if not exists(select 1 from public.trustlane_signatures where lead_id='cccccccc-cccc-4ccc-cccc-cccccccccccc' and signer_ip='203.0.113.8'::inet and signed_snapshot->>'pickup_address'='123 Test pickup' and agreement_body like 'TEST TERMS%') then raise exception 'Signature snapshot missing'; end if;
  begin update public.trustlane_quote_requests set signed_contract_version=999 where id='cccccccc-cccc-4ccc-cccc-cccccccccccc'; raise exception 'Agent could forge signature version'; exception when insufficient_privilege then null; end;
 end $$;
 update public.trustlane_quote_requests set quote_amount=1000 where id='cccccccc-cccc-4ccc-cccc-cccccccccccc';
