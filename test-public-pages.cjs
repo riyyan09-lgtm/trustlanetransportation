@@ -1,5 +1,5 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
-const names=['how-it-works','services','business','shipping-costs','locations','guides','dealer-guide','prepare-vehicle','contact'];
+const names=['how-it-works','services','business','shipping-costs','locations','guides','dealer-guide','prepare-vehicle','contact','auction-guide','fleet-guide'];
 test('quote form is near the top and remains unique',()=>{
  const h=fs.readFileSync('index.html','utf8');assert.ok(h.indexOf('id="quote"')<h.indexOf('class="intro wrap"'));assert.equal((h.match(/id="quote-form"/g)||[]).length,1);
 });
