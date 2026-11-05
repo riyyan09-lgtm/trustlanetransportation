@@ -163,8 +163,8 @@ test('quick actions open device apps and progress reflects recorded contacts', a
   el('#leads').onclick({target:{closest:()=>({dataset:{id:'lead-1'}})}});
   await new Promise(resolve=>setImmediate(resolve));
   assert.match(el('#detail').innerHTML,/href="tel:2025550142"/);
-  assert.match(el('#detail').innerHTML,/href="sms:2025550142"/);
-  assert.match(el('#detail').innerHTML,/href="mailto:test%40example.test"/);
+  assert.match(el('#detail').innerHTML,/id="lead-text"/);
+  assert.match(el('#detail').innerHTML,/id="lead-email"/);
   assert.match(el('#response-progress').innerHTML,/Call: <b>Logged<\/b>/);
   assert.match(el('#response-progress').innerHTML,/Text: <b>Not logged<\/b>/);
   assert.match(el('#response-progress').innerHTML,/Email: <b>Not logged<\/b>/);

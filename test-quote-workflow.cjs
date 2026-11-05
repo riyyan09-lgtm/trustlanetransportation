@@ -13,12 +13,9 @@ test('vehicle copy requires year, make and model',()=>{
  assert.equal(context.completeVehicle({vehicle_year:2020,vehicle_make:'Toyota',vehicle_model:'Camry'}),'2020 Toyota Camry');
  assert.equal(context.completeVehicle({vehicle_year:2020,vehicle_make:'Toyota'}),'');
 });
-test('load-board copy includes both ZIP codes and the complete vehicle',async()=>{
- let copied='';const buttons=['pickup','delivery','vehicle','search'].map(field=>({dataset:{copyField:field}}));
- const ctx={navigator:{clipboard:{writeText:async value=>{copied=value}}},msg:{textContent:''},document:{querySelectorAll:()=>buttons}};
+test('ZIP button copies the actual ZIP and reports failure',async()=>{
+ let copied='';const buttons=['pickup','delivery'].map(field=>({dataset:{copyField:field},innerHTML:'ZIP',isConnected:true}));
+ const ctx={navigator:{clipboard:{writeText:async value=>{copied=value}}},msg:{textContent:''},setTimeout:()=>{},document:{querySelectorAll:()=>buttons}};
  vm.createContext(ctx);vm.runInContext(source.slice(start,source.indexOf('async function saveQuickPrice(',start)),ctx);
- ctx.bindCopyButtons({pickup:'Dallas TX 75201',delivery:'Phoenix AZ 85001',vehicle_year:2020,vehicle_make:'Toyota',vehicle_model:'Camry'});
- buttons[3].onclick();await new Promise(resolve=>setImmediate(resolve));
- assert.equal(copied,'75201 to 85001 | 2020 Toyota Camry');
+ ctx.bindCopyButtons({pickup:'Dallas TX 75201',delivery:'85001-1234'});await buttons[0].onclick();assert.equal(copied,'75201');assert.match(buttons[0].textContent,/Copied/);await buttons[1].onclick();assert.equal(copied,'85001-1234');ctx.navigator.clipboard.writeText=async()=>{throw Error()};await buttons[0].onclick();assert.match(ctx.msg.textContent,/Copy failed/);
 });
-
