@@ -3,10 +3,10 @@ const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const fs = require('node:fs');
 
-async function openDashboard(role, existingOrder=false) {
+async function openDashboard(role, existingOrder=false, withSignature=false) {
   const els = new Map();
   const el = id => {
-    if (!els.has(id)) els.set(id, { hidden: true, textContent: '', innerHTML: '', value: '', reset() {},classList:{add(){},remove(){}} });
+    if (!els.has(id)) els.set(id, { hidden: true, textContent: '', innerHTML: '', value: '', reset() {},classList:{add(){},remove(){},toggle(){}} });
     return els.get(id);
   };
   const reply = data => ({ ok: true, json: async () => data });
@@ -18,13 +18,13 @@ async function openDashboard(role, existingOrder=false) {
     if (url === '/api/config') return reply({ supabaseUrl: 'https://example.test', supabaseAnonKey: 'public' });
     if (url.includes('/auth/v1/token')) return reply({ access_token: 'token', user: { id: 'user-1' } });
     if (url.includes('trustlane_profiles?user_id=')) return reply([{ display_name: 'Test User', role, active: true }]);
-    if (url.includes('trustlane_quote_requests')) return reply([{ id: 'lead-1', name: 'Test Lead', email:'test@example.test', pickup: 'A', delivery: 'B', vehicle_make: 'Make', vehicle_model: 'Model', status: 'New', created_at: '2026-01-01' }]);
+    if (url.includes('trustlane_quote_requests')) return reply([{ id: 'lead-1', name: 'Test Lead', email:'test@example.test', phone:'2025550142', pickup: 'A', delivery: 'B', vehicle_make: 'Make', vehicle_model: 'Model', status: 'New', created_at: '2026-01-01' }]);
     if (url.includes('trustlane_notes')) return reply([]);
     if (url.includes('trustlane_lead_activity')) return reply([{ occurred_at: '2026-10-30T12:00:00Z', changes: { working_status: { from: 'New', to: '<Follow Up>' } } }]);
     if (url.includes('trustlane_quote_drafts')) return reply([{ id: 'quote-1', created_at: '2026-10-30T12:00:00Z', snapshot: { name:'Test Lead', pickup:'A', delivery:'B', quote_amount: 123.45, special_terms:'<terms>', additional_vehicles:[{year:2021,make:'Test',model:'Second'}] } }]);
     if (url.includes('trustlane_order_events')) return reply([{created_at:'2026-10-30T12:00:00Z',previous_stage:'Dispatched',new_stage:'<Picked up>'}]);
     if (url.includes('trustlane_invoices')) return reply([{id:'12345678-invoice',issued_on:'2026-10-30',snapshot:{name:'<Customer>',quote_amount:123.45,vehicle_make:'Test',carrier_pay:75}}]);
-    if (url.includes('trustlane_signatures')) return reply([]);
+    if (url.includes('trustlane_signatures')) return reply(withSignature?[{id:'signature-1',signed_name:'Test Signer',signed_at:'2026-10-30T12:00:00Z',signer_ip:'203.0.113.8',agreement_body:'Test agreement',signed_snapshot:{name:'Test Lead',quote_amount:123.45}}]:[]);
     if (url.includes('trustlane_orders')) return reply(existingOrder?[{id:'order-1',stage:'Dispatched',created_at:'2026-10-30T12:00:00Z',confirmation_note:'<Agreed>'}]:[]);
     if (url.includes('rpc/trustlane_record_manual_order')) return reply('order-1');
     if (url.includes('rpc/trustlane_issue_booking_link')) return reply('link-1');
@@ -36,7 +36,7 @@ async function openDashboard(role, existingOrder=false) {
     throw new Error('Unexpected endpoint: ' + url);
   };
   let downloaded = '';
-  const context = { document: { querySelector: s => el(s),querySelectorAll: s => s.includes('data-detail-panel')?panels:tabs, createElement: () => ({ click() {} }) }, fetch, FormData: class { constructor(form){this.values=form.values||{email:'test@example.test',password:'test'}} get(k){return this.values[k]??null} *[Symbol.iterator]() { yield* Object.entries(this.values); } }, URLSearchParams, location: { hash: '', pathname: '/portal.html',origin:'https://example.test' }, history: { replaceState() {} }, Date, console, crypto:require('node:crypto').webcrypto,TextEncoder,Blob: class { constructor(parts) { downloaded = parts.join(''); } }, URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} }, setTimeout: fn => fn() };
+  const context = { document: { querySelector: s => el(s),querySelectorAll: s => s.includes('data-detail-panel')?panels:tabs, createElement: () => ({ click() {} }) }, fetch, FormData: class { constructor(form){this.values=form.values||{email:'test@example.test',password:'test'}} get(k){return this.values[k]??null} *[Symbol.iterator]() { yield* Object.entries(this.values); } }, URLSearchParams, location: { hash: '', pathname: '/portal.html',origin:'https://example.test' }, history: { replaceState() {} }, Date, console, crypto:require('node:crypto').webcrypto,TextEncoder,Blob: class { constructor(parts) { downloaded = parts.join(''); } }, URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} }, setTimeout: fn => fn(),setInterval:()=>1,clearInterval(){} };
   vm.runInNewContext(fs.readFileSync('portal.js', 'utf8'), context);
   await new Promise(resolve => setImmediate(resolve));
   await el('#login-form').onsubmit({ preventDefault(){}, target: { reset(){} } });
@@ -142,6 +142,29 @@ test('lead detail renders escaped follow-up tasks', async () => {
   assert.match(el.downloaded(), /&lt;terms&gt;/);
   assert.match(el.downloaded(), /2021 Test Second/);
   assert.doesNotMatch(el.downloaded(), /Carrier pay/);
+});
+
+test('quick actions open device apps and progress reflects recorded contacts', async () => {
+  const el=await openDashboard('agent');
+  el('#leads').onclick({target:{closest:()=>({dataset:{id:'lead-1'}})}});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.match(el('#detail').innerHTML,/href="tel:2025550142"/);
+  assert.match(el('#detail').innerHTML,/href="sms:2025550142"/);
+  assert.match(el('#detail').innerHTML,/href="mailto:test%40example.test"/);
+  assert.match(el('#response-progress').innerHTML,/Call: <b>Logged<\/b>/);
+  assert.match(el('#response-progress').innerHTML,/Text: <b>Not logged<\/b>/);
+  assert.match(el('#response-progress').innerHTML,/Email: <b>Not logged<\/b>/);
+  assert.equal(el.requests.some(r=>r.options?.method==='POST'&&r.url.includes('trustlane_contact_events')),false);
+});
+
+test('signature history and downloaded agreement include the recorded IP', async () => {
+  const el=await openDashboard('agent',false,true);
+  el('#leads').onclick({target:{closest:()=>({dataset:{id:'lead-1'}})}});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.match(el('#signature-list').innerHTML,/203\.0\.113\.8/);
+  el('#signature-list').onclick({target:{closest:()=>({dataset:{signature:'signature-1'}})}});
+  assert.match(el.downloaded(),/Signing IP/);
+  assert.match(el.downloaded(),/203\.0\.113\.8/);
 });
 
 test('pipeline view filters leads by stage', async () => {
