@@ -122,7 +122,8 @@ test('lead detail renders escaped follow-up tasks', async () => {
   assert.match(el('#task-list').innerHTML, /&lt;Call customer&gt;/);
   assert.match(el('#task-list').innerHTML, /Complete/);
   assert.equal(typeof el('#task-form').onsubmit, 'function');
-  assert.match(el('#working-details').innerHTML, /Customer quote amount/);
+  assert.match(el('#detail').innerHTML, /id="quick-price"/);
+  assert.doesNotMatch(el('#working-details').innerHTML, /name="quote_amount"/);
   assert.match(el('#working-details').innerHTML, /Carrier pay/);
   assert.match(el('#working-details').innerHTML, /Working status/);
   assert.equal(typeof el('#working-form').onsubmit, 'function');
@@ -145,6 +146,16 @@ test('lead detail renders escaped follow-up tasks', async () => {
   assert.match(el.downloaded(), /&lt;terms&gt;/);
   assert.match(el.downloaded(), /2021 Test Second/);
   assert.doesNotMatch(el.downloaded(), /Carrier pay/);
+});
+
+test('saving shipment fields does not clear the quote price', async () => {
+  const el=await openDashboard('agent');
+  el('#leads').onclick({target:{closest:()=>({dataset:{id:'lead-1'}})}});
+  await new Promise(resolve=>setImmediate(resolve));
+  await el('#working-form').onsubmit({preventDefault(){},target:{values:{name:'Test Lead',email:'test@example.test',phone:'2025550142',pickup:'A',delivery:'B',vehicle_year:'2020',vehicle_make:'Make',vehicle_model:'Model',preferred_date:'2026-11-20',carrier_pay:'',quote_expires_on:'',desired_delivery_on:''}}});
+  const req=el.requests.find(r=>r.url.includes('trustlane_quote_requests?id=')&&r.options?.method==='PATCH');
+  assert.ok(req);
+  assert.equal(Object.hasOwn(JSON.parse(req.options.body),'quote_amount'),false);
 });
 
 test('quick actions open device apps and progress reflects recorded contacts', async () => {
@@ -248,4 +259,3 @@ test('manual lead entry is available to an agent', async () => {
   assert.equal(typeof el('#manual-lead-form').onsubmit, 'function');
   assert.match(fs.readFileSync('portal.html', 'utf8'), /name="vehicle_year"/);
 });
-
