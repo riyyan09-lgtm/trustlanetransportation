@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const fs = require('node:fs');
 
-async function openDashboard(role, existingOrder=false, withSignature=false) {
+async function openDashboard(role, existingOrder=false, withSignature=false, failLink=false) {
   const els = new Map();
   const el = id => {
     if (!els.has(id)) els.set(id, { hidden: true, textContent: '', innerHTML: '', value: '', reset() {},classList:{add(){},remove(){},toggle(){}} });
@@ -18,7 +18,7 @@ async function openDashboard(role, existingOrder=false, withSignature=false) {
     if (url === '/api/config') return reply({ supabaseUrl: 'https://example.test', supabaseAnonKey: 'public' });
     if (url.includes('/auth/v1/token')) return reply({ access_token: 'token', user: { id: 'user-1' } });
     if (url.includes('trustlane_profiles?user_id=')) return reply([{ display_name: 'Test User', role, active: true }]);
-    if (url.includes('trustlane_quote_requests')) return reply([{ id: 'lead-1', name: 'Test Lead', email:'test@example.test', phone:'2025550142', pickup: 'A', delivery: 'B', vehicle_make: 'Make', vehicle_model: 'Model', status: 'New', created_at: '2026-01-01' }]);
+    if (url.includes('trustlane_quote_requests')) return reply([{ id: 'lead-1', name: 'Test Lead', email:'test@example.test', phone:'2025550142', pickup: 'A', delivery: 'B', vehicle_make: 'Make', vehicle_model: 'Model', quote_amount:options?.method==='PATCH'?JSON.parse(options.body).quote_amount:null, status: 'New', created_at: '2026-01-01' }]);
     if (url.includes('trustlane_notes')) return reply([]);
     if (url.includes('trustlane_lead_activity')) return reply([{ occurred_at: '2026-10-30T12:00:00Z', changes: { working_status: { from: 'New', to: '<Follow Up>' } } }]);
     if (url.includes('trustlane_quote_drafts')) return reply([{ id: 'quote-1', created_at: '2026-10-30T12:00:00Z', snapshot: { name:'Test Lead', pickup:'A', delivery:'B', quote_amount: 123.45, special_terms:'<terms>', additional_vehicles:[{year:2021,make:'Test',model:'Second'}] } }]);
@@ -27,7 +27,8 @@ async function openDashboard(role, existingOrder=false, withSignature=false) {
     if (url.includes('trustlane_signatures')) return reply(withSignature?[{id:'signature-1',signed_name:'Test Signer',signed_at:'2026-10-30T12:00:00Z',signer_ip:'203.0.113.8',agreement_body:'Test agreement',signed_snapshot:{name:'Test Lead',quote_amount:123.45}}]:[]);
     if (url.includes('trustlane_orders')) return reply(existingOrder?[{id:'order-1',stage:'Dispatched',created_at:'2026-10-30T12:00:00Z',confirmation_note:'<Agreed>'}]:[]);
     if (url.includes('rpc/trustlane_record_manual_order')) return reply('order-1');
-    if (url.includes('rpc/trustlane_issue_booking_link')) return reply('link-1');
+    if (url.includes('rpc/trustlane_issue_booking_link')) return failLink?{ok:false,json:async()=>({message:'Link creation failed'})}:reply('link-1');
+    if (url.includes('rpc/trustlane_create_quote_draft')) return reply('quote-1');
     if (url.includes('trustlane_vehicles')) return reply([{id:'vehicle-1',year:2021,make:'Test',model:'<Second>',active:true}]);
     if (url.includes('trustlane_contact_events')) return reply([{kind:'Call',outcome:'<No answer>',details:'Follow up',created_at:'2026-10-30T12:00:00Z'}]);
     if (url.includes('trustlane_payment_records')) return reply([{kind:'Payment',amount:125,transaction_date:'2026-10-30',reference:'<ref>'}]);
@@ -36,13 +37,14 @@ async function openDashboard(role, existingOrder=false, withSignature=false) {
     throw new Error('Unexpected endpoint: ' + url);
   };
   let downloaded = '';
-  const context = { document: { querySelector: s => el(s),querySelectorAll: s => s.includes('data-detail-panel')?panels:tabs, createElement: () => ({ click() {} }) }, fetch, FormData: class { constructor(form){this.values=form.values||{email:'test@example.test',password:'test'}} get(k){return this.values[k]??null} *[Symbol.iterator]() { yield* Object.entries(this.values); } }, URLSearchParams, location: { hash: '', pathname: '/portal.html',origin:'https://example.test' }, history: { replaceState() {} }, Date, console, crypto:require('node:crypto').webcrypto,TextEncoder,Blob: class { constructor(parts) { downloaded = parts.join(''); } }, URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} }, setTimeout: fn => fn(),setInterval:()=>1,clearInterval(){} };
+  const context = { document: { querySelector: s => el(s),querySelectorAll: s => s.includes('data-detail-panel')?panels:tabs, createElement: () => ({ click() {} }) }, fetch, navigator:{clipboard:{writeText:async()=>{}}}, FormData: class { constructor(form){this.values=form.values||{email:'test@example.test',password:'test'}} get(k){return this.values[k]??null} *[Symbol.iterator]() { yield* Object.entries(this.values); } }, URLSearchParams, location: { hash: '', pathname: '/portal.html',origin:'https://example.test' }, history: { replaceState() {} }, Date, console, crypto:require('node:crypto').webcrypto,TextEncoder,Blob: class { constructor(parts) { downloaded = parts.join(''); } }, URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} }, setTimeout: fn => fn(),setInterval:()=>1,clearInterval(){} };
   vm.runInNewContext(fs.readFileSync('portal.js', 'utf8'), context);
   await new Promise(resolve => setImmediate(resolve));
   await el('#login-form').onsubmit({ preventDefault(){}, target: { reset(){} } });
   el.downloaded = () => downloaded;
   el.requests = requests;
   el.panels = panels; el.tabs = tabs;
+  el.context=context;
   return el;
 }
 
@@ -155,6 +157,36 @@ test('quick actions open device apps and progress reflects recorded contacts', a
   assert.match(el('#response-progress').innerHTML,/Text: <b>Not logged<\/b>/);
   assert.match(el('#response-progress').innerHTML,/Email: <b>Not logged<\/b>/);
   assert.equal(el.requests.some(r=>r.options?.method==='POST'&&r.url.includes('trustlane_contact_events')),false);
+});
+
+test('prepared quote text contains a new booking link and price changes invalidate it', async () => {
+  const el=await openDashboard('agent');
+  el('#leads').onclick({target:{closest:()=>({dataset:{id:'lead-1'}})}});
+  await new Promise(resolve=>setImmediate(resolve));
+  el('#quick-price').value='1250.00';
+  await el('#prepare-quote').onclick();
+  const message=el('#quick-quote-message').value;
+  assert.match(message,/\$1250\.00/);
+  assert.match(message,/https:\/\/example\.test\/booking\.html#[a-f0-9]{64}/);
+  assert.equal(el('#open-quote-text').disabled,false);
+  const call=el.requests.find(r=>r.url.includes('rpc/trustlane_issue_booking_link'));
+  assert.ok(call);
+  assert.equal(call.options.body.includes(message.split('#')[1].split('\n')[0]),false);
+  el('#quick-price').oninput();
+  assert.equal(el('#quick-quote-message').value,'');
+  assert.equal(el('#open-quote-text').disabled,true);
+});
+
+test('quote text cannot be sent when booking link creation fails', async () => {
+  const el=await openDashboard('agent',false,false,true);
+  el('#leads').onclick({target:{closest:()=>({dataset:{id:'lead-1'}})}});
+  await new Promise(resolve=>setImmediate(resolve));
+  el('#quick-price').value='1250';
+  await el('#prepare-quote').onclick();
+  assert.equal(el('#quick-quote-message').value,'');
+  assert.equal(el('#copy-quote-text').disabled,true);
+  assert.equal(el('#open-quote-text').disabled,true);
+  assert.match(el('#message').textContent,/Link creation failed/);
 });
 
 test('signature history and downloaded agreement include the recorded IP', async () => {
