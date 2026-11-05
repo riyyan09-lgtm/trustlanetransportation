@@ -27,6 +27,7 @@ async function openDashboard(role, existingOrder=false, withSignature=false, fai
     if (url.includes('trustlane_signatures')) return reply(withSignature?[{id:'signature-1',signed_name:'Test Signer',signed_at:'2026-10-30T12:00:00Z',signer_ip:'203.0.113.8',agreement_body:'Test agreement',signed_snapshot:{name:'Test Lead',quote_amount:123.45}}]:[]);
     if (url.includes('trustlane_orders')) return reply(existingOrder?[{id:'order-1',stage:'Dispatched',created_at:'2026-10-30T12:00:00Z',confirmation_note:'<Agreed>'}]:[]);
     if (url.includes('rpc/trustlane_record_manual_order')) return reply('order-1');
+    if (url.includes('rpc/trustlane_update_lead')) return reply(null);
     if (url.includes('rpc/trustlane_issue_booking_link')) return failLink?{ok:false,json:async()=>({message:'Link creation failed'})}:reply('link-1');
     if (url.includes('rpc/trustlane_create_quote_draft')) return reply('quote-1');
     if (url.includes('trustlane_vehicles')) return reply([{id:'vehicle-1',year:2021,make:'Test',model:'<Second>',active:true}]);
@@ -172,9 +173,20 @@ test('prepared quote text contains a new booking link and price changes invalida
   const call=el.requests.find(r=>r.url.includes('rpc/trustlane_issue_booking_link'));
   assert.ok(call);
   assert.equal(call.options.body.includes(message.split('#')[1].split('\n')[0]),false);
+  assert.equal(el.requests.some(r=>r.url.includes('rpc/trustlane_update_lead')),false);
   el('#quick-price').oninput();
   assert.equal(el('#quick-quote-message').value,'');
   assert.equal(el('#open-quote-text').disabled,true);
+});
+
+test('agent explicitly sets quoted status through the existing status function', async () => {
+  const el=await openDashboard('agent');
+  el('#leads').onclick({target:{closest:()=>({dataset:{id:'lead-1'}})}});
+  await new Promise(resolve=>setImmediate(resolve));
+  await el('#update').onsubmit({preventDefault(){},target:{values:{status:'Quoted',outcome:'',assignee:''}}});
+  const req=el.requests.find(r=>r.url.includes('rpc/trustlane_update_lead'));
+  assert.equal(JSON.parse(req.options.body).p_status,'Quoted');
+  assert.equal(JSON.parse(req.options.body).p_change_assignment,false);
 });
 
 test('quote text cannot be sent when booking link creation fails', async () => {
@@ -236,3 +248,4 @@ test('manual lead entry is available to an agent', async () => {
   assert.equal(typeof el('#manual-lead-form').onsubmit, 'function');
   assert.match(fs.readFileSync('portal.html', 'utf8'), /name="vehicle_year"/);
 });
+
