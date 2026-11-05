@@ -18,7 +18,7 @@ async function openDashboard(role, existingOrder=false, withSignature=false, fai
     if (url === '/api/config') return reply({ supabaseUrl: 'https://example.test', supabaseAnonKey: 'public' });
     if (url.includes('/auth/v1/token')) return reply({ access_token: 'token', user: { id: 'user-1' } });
     if (url.includes('trustlane_profiles?user_id=')) return reply([{ display_name: 'Test User', role, active: true }]);
-    if (url.includes('trustlane_quote_requests')) return reply([{ id: 'lead-1', name: 'Test Lead', email:'test@example.test', phone:'2025550142', pickup: 'A', delivery: 'B', vehicle_make: 'Make', vehicle_model: 'Model', quote_amount:options?.method==='PATCH'?JSON.parse(options.body).quote_amount:null, status: 'New', created_at: '2026-01-01' }]);
+    if (url.includes('trustlane_quote_requests')) return reply([{ id: 'lead-1', name: 'Test Lead', assigned_to:'user-1', email:'test@example.test', phone:'2025550142', pickup: 'A', delivery: 'B', vehicle_make: 'Make', vehicle_model: 'Model', quote_amount:options?.method==='PATCH'?JSON.parse(options.body).quote_amount:null, status: 'New', created_at: '2026-01-01' }]);
     if (url.includes('trustlane_notes')) return reply([]);
     if (url.includes('trustlane_lead_activity')) return reply([{ occurred_at: '2026-10-30T12:00:00Z', changes: { working_status: { from: 'New', to: '<Follow Up>' } } }]);
     if (url.includes('trustlane_quote_drafts')) return reply([{ id: 'quote-1', created_at: '2026-10-30T12:00:00Z', snapshot: { name:'Test Lead', pickup:'A', delivery:'B', quote_amount: 123.45, special_terms:'<terms>', additional_vehicles:[{year:2021,make:'Test',model:'Second'}] } }]);
@@ -178,7 +178,10 @@ test('prepared quote text contains a new booking link and price changes invalida
   el('#quick-price').value='1250.00';
   await el('#prepare-quote').onclick();
   const message=el('#quick-quote-message').value;
-  assert.match(message,/\$1250\.00/);
+  assert.match(message,/\$1,250\.00/);
+  assert.match(message,/Hi Test,/);
+  assert.match(message,/Quote ID: quote-1/);
+  assert.match(message,/Test User/);
   assert.match(message,/https:\/\/example\.test\/booking\.html#[a-f0-9]{64}/);
   assert.equal(el('#open-quote-text').disabled,false);
   const call=el.requests.find(r=>r.url.includes('rpc/trustlane_issue_booking_link'));

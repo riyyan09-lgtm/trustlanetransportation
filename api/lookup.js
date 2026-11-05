@@ -9,7 +9,7 @@ module.exports = async function handler(req,res){
   else return res.status(400).json({error:'Invalid lookup parameters.'});
   const cached=cache.get(url);if(cached&&cached.expires>Date.now())return res.status(200).json(cached.data);
   try{
-    const response=await fetch(url,{signal:AbortSignal.timeout(8000)});
+    const response=await fetch(url,{signal:AbortSignal.timeout(18000)});
     if(response.status===404&&kind==='zip')return res.status(404).json({error:'No location found for this ZIP.'});
     if(!response.ok)throw Error('Lookup unavailable');
     const raw=await response.json();let data;
