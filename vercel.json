@@ -7,5 +7,20 @@
     "api/import.js": {
       "maxDuration": 60
     }
-  }
+  },
+  "framework": null,
+  "buildCommand": "node build-preview.cjs",
+  "installCommand": "",
+  "outputDirectory": "dist",
+  "headers": [
+    {
+      "source": "/portal.html",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    }
+  ]
 }
