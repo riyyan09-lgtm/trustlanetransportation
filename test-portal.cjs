@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const fs = require('node:fs');
 
-async function openDashboard(role, existingOrder=false, withSignature=false, failLink=false) {
+async function openDashboard(role, existingOrder=false, withSignature=false, failLink=false, search="") {
   const els = new Map();
   const el = id => {
     if (!els.has(id)) els.set(id, { hidden: true, textContent: '', innerHTML: '', value: '', reset() {},classList:{add(){},remove(){},toggle(){}} });
@@ -38,7 +38,7 @@ async function openDashboard(role, existingOrder=false, withSignature=false, fai
     throw new Error('Unexpected endpoint: ' + url);
   };
   let downloaded = '';
-  const context = { document: { querySelector: s => el(s),querySelectorAll: s => s.includes('data-detail-panel')?panels:tabs, createElement: () => ({ click() {} }) }, fetch, navigator:{clipboard:{writeText:async()=>{}}}, FormData: class { constructor(form){this.values=form.values||{email:'test@example.test',password:'test'}} get(k){return this.values[k]??null} *[Symbol.iterator]() { yield* Object.entries(this.values); } }, URLSearchParams, location: { hash: '', pathname: '/portal.html',origin:'https://example.test' }, history: { replaceState() {} }, Date, console, crypto:require('node:crypto').webcrypto,TextEncoder,Blob: class { constructor(parts) { downloaded = parts.join(''); } }, URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} }, setTimeout: fn => fn(),setInterval:()=>1,clearInterval(){} };
+  const context = { document: { querySelector: s => el(s),querySelectorAll: s => s.includes('data-detail-panel')?panels:tabs, createElement: () => ({ click() {} }) }, fetch, navigator:{clipboard:{writeText:async()=>{}}}, FormData: class { constructor(form){this.values=form.values||{email:'test@example.test',password:'test'}} get(k){return this.values[k]??null} *[Symbol.iterator]() { yield* Object.entries(this.values); } }, URLSearchParams, location: { hash: '', search, pathname: '/portal.html',origin:'https://example.test' }, history: { replaceState() {} }, Date, console, crypto:require('node:crypto').webcrypto,TextEncoder,Blob: class { constructor(parts) { downloaded = parts.join(''); } }, URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} }, setTimeout: fn => fn(),setInterval:()=>1,clearInterval(){} };
   vm.runInNewContext(fs.readFileSync('portal.js', 'utf8'), context);
   await new Promise(resolve => setImmediate(resolve));
   await el('#login-form').onsubmit({ preventDefault(){}, target: { reset(){} } });
@@ -263,3 +263,5 @@ test('manual lead entry is available to an agent', async () => {
   assert.equal(typeof el('#manual-lead-form').onsubmit, 'function');
   assert.match(fs.readFileSync('portal.html', 'utf8'), /name="vehicle_year"/);
 });
+
+test('admin CRM has a visible link to the importer and agents do not',async()=>{const admin=await openDashboard('admin',false,false,false,'?workspace=crm');assert.equal(admin('#dashboard').hidden,false);assert.equal(admin('#lead-drop').hidden,true);assert.equal(admin('#admin-drop-link').hidden,false);const agent=await openDashboard('agent',false,false,false,'?workspace=import');assert.equal(agent('#dashboard').hidden,false);assert.equal(agent('#lead-drop').hidden,true);assert.equal(agent('#admin-drop-link').hidden,true)});
