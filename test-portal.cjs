@@ -51,7 +51,8 @@ async function openDashboard(role, existingOrder=false, withSignature=false, fai
 
 test('administrator sees team management and lead summary with escaped agent names', async () => {
   const el = await openDashboard('admin');
-  assert.equal(el('#dashboard').hidden, false);
+  assert.equal(el('#dashboard').hidden, true);
+  assert.equal(el('#lead-drop').hidden, false);
   assert.equal(el('#agent-management').hidden, false);
   assert.equal(el('#stat-total').textContent, 1);
   assert.equal(el('#stat-new').textContent, 1);

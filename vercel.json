@@ -3,6 +3,9 @@
   "functions": {
     "api/lookup.js": {
       "maxDuration": 25
+    },
+    "api/import.js": {
+      "maxDuration": 60
     }
   }
 }
